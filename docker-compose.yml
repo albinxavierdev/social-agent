@@ -1,0 +1,21 @@
+# Local development stack: Postgres + API + worker. `docker compose up --build`
+# Uses mock LLM/image providers and local storage; no external credentials needed.
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment: { POSTGRES_PASSWORD: postgres, POSTGRES_DB: content_agent }
+    ports: ["127.0.0.1:5432:5432"]
+    healthcheck: { test: ["CMD-SHELL", "pg_isready -U postgres"], interval: 3s, retries: 20 }
+  api:
+    build: .
+    command: ["content-agent-api"]
+    env_file: [.env]
+    environment: { DATABASE_URL: "postgres://postgres:postgres@postgres:5432/content_agent" }
+    ports: ["127.0.0.1:8080:8080"]
+    depends_on: { postgres: { condition: service_healthy } }
+  worker:
+    build: .
+    command: ["content-agent-worker"]
+    env_file: [.env]
+    environment: { DATABASE_URL: "postgres://postgres:postgres@postgres:5432/content_agent" }
+    depends_on: { postgres: { condition: service_healthy } }
