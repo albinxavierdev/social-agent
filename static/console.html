@@ -1,0 +1,489 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Content Agent · Tool console</title>
+<style>
+/* Tokens from the LWM Design System (Figma: "LWM Colors" collection, Foundations page). */
+:root{
+  --primary-50:#F6F2FD;--primary-100:#EDE5FA;--primary-200:#DCCCF4;--primary-400:#9E77DF;--primary-500:#6D2CD8;--primary-600:#5C26B5;--primary-700:#4C2291;
+  --n0:#FFFFFF;--n50:#FAFAFC;--n100:#F6F6FB;--n200:#F0F0F1;--n300:#DEDEE3;--n500:#8E8E97;--n600:#707079;--n700:#53535B;--n800:#2E2E34;--n900:#111113;
+  --ok-100:#E1F9EB;--ok-500:#1F9D55;--ok-700:#145C33;--warn-100:#FDEEDD;--warn-700:#7E470B;--err-100:#FDE8E9;--err-500:#E9242D;--err-700:#951319;
+  --r-input:8px;--r-card:12px;
+  --font:Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;font:400 14px/22px var(--font);color:var(--n700);background:var(--n100)}
+:focus-visible{outline:2px solid var(--primary-400);outline-offset:2px}
+.app{display:grid;grid-template-columns:264px 1fr;min-height:100%}
+/* Sidebar */
+aside{background:var(--n0);border-right:1px solid var(--n200);padding:16px 12px;position:sticky;top:0;height:100vh;overflow:auto}
+.logo{display:flex;align-items:center;gap:8px;padding:8px 8px 16px}
+.logo b{font:700 18px/24px var(--font);color:var(--n900);letter-spacing:-.01em}
+.logo small{display:block;font:500 12px/18px var(--font);color:var(--n600)}
+#filter{width:100%;margin:0 0 12px}
+.group{font:500 12px/18px var(--font);color:var(--n600);text-transform:uppercase;letter-spacing:.04em;padding:12px 8px 4px}
+.tool{display:flex;align-items:center;gap:8px;width:100%;text-align:left;border:0;background:transparent;color:var(--n700);font:500 14px/22px var(--font);padding:8px;border-radius:var(--r-input);cursor:pointer;transition:background .15s ease-out}
+.tool:hover{background:var(--n100)}
+.tool[aria-current="true"]{background:var(--primary-50);color:var(--primary-700)}
+.tool svg{width:16px;height:16px;flex:none;stroke:var(--n600)}
+.tool[aria-current="true"] svg{stroke:var(--primary-500)}
+/* Main */
+main{padding:32px;max-width:1180px;width:100%}
+h1{font:700 30px/38px var(--font);color:var(--n900);margin:0 0 4px}
+h2{font:600 16px/24px var(--font);color:var(--n900);margin:0}
+.sub{color:var(--n600);margin:0 0 24px}
+.grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:24px}
+.card{background:var(--n0);border:1px solid var(--n200);border-radius:var(--r-card);padding:24px;margin-bottom:24px}
+.card header{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:16px}
+label{display:block;font:500 12px/18px var(--font);color:var(--n700);margin:0 0 4px}
+.help{font:500 12px/18px var(--font);color:var(--n600);margin:4px 0 0}
+input,textarea{width:100%;font:400 14px/22px var(--font);color:var(--n900);background:var(--n0);border:1px solid var(--n300);border-radius:var(--r-input);padding:8px 12px}
+input:hover,textarea:hover{border-color:var(--n500)}
+textarea{font-family:var(--mono);font-size:13px;line-height:20px;min-height:200px;resize:vertical;white-space:pre}
+.row{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:12px}
+.btn{font:600 14px/22px var(--font);border:1px solid transparent;border-radius:var(--r-input);padding:8px 16px;cursor:pointer;transition:background .15s ease-out,border-color .15s ease-out}
+.btn.primary{background:var(--primary-500);color:#fff}
+.btn.primary:hover{background:var(--primary-600)}
+.btn.primary[disabled]{background:var(--n300);color:var(--n600);cursor:not-allowed}
+.btn.ghost{background:var(--n0);color:var(--n700);border-color:var(--n300)}
+.btn.ghost:hover{background:var(--n100)}
+.actions{display:flex;gap:8px;margin-top:12px}
+.pill{display:inline-flex;align-items:center;border-radius:999px;padding:2px 10px;font:500 12px/18px var(--font)}
+.pill.ok{background:var(--ok-100);color:var(--ok-700)}
+.pill.err{background:var(--err-100);color:var(--err-700)}
+.pill.idle{background:var(--n200);color:var(--n700)}
+.pill.soft{background:var(--primary-50);color:var(--primary-700)}
+pre{margin:0;background:var(--n50);border:1px solid var(--n200);border-radius:var(--r-input);padding:12px;font:400 13px/20px var(--mono);color:var(--n900);overflow:auto;max-height:520px;white-space:pre-wrap;word-break:break-word}
+.meta{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:12px;color:var(--n600);font:500 12px/18px var(--font)}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chip{font:500 12px/18px var(--mono);background:var(--primary-50);color:var(--primary-700);border:0;border-radius:999px;padding:2px 10px;cursor:pointer}
+.chip:hover{background:var(--primary-100)}
+table{width:100%;border-collapse:collapse}
+th{font:500 12px/18px var(--font);color:var(--n600);text-align:left;padding:8px 12px;border-bottom:1px solid var(--n200)}
+td{padding:8px 12px;border-bottom:1px solid var(--n200)}
+tbody tr{cursor:pointer;transition:background .15s ease-out}
+tbody tr:hover{background:var(--n100)}
+.warn{background:var(--warn-100);color:var(--warn-700);border-radius:var(--r-input);padding:8px 12px;margin-bottom:24px;font:500 12px/18px var(--font)}
+
+.reader{background:var(--n50);border:1px solid var(--n200);border-radius:var(--r-input);padding:16px;max-height:420px;overflow:auto;white-space:pre-wrap;word-break:break-word;color:var(--n900);font:400 14px/22px var(--font)}
+.kv{display:grid;grid-template-columns:max-content 1fr;gap:4px 16px;margin:0 0 16px}
+.kv dt{font:500 12px/22px var(--font);color:var(--n600)}.kv dd{margin:0;color:var(--n900);word-break:break-word}
+.vtitle{font:600 20px/28px var(--font);color:var(--n900);margin:0 0 4px}
+.thumbs{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 16px}
+.thumbs img{width:120px;height:80px;object-fit:cover;border-radius:var(--r-input);border:1px solid var(--n200);background:var(--n100)}
+.vcards{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px}
+.vcard{border:1px solid var(--n200);border-radius:var(--r-card);padding:16px;background:var(--n0)}
+.vcard h3{font:600 14px/22px var(--font);color:var(--n900);margin:0 0 8px;display:flex;justify-content:space-between;gap:8px}
+.vcard p{margin:0 0 8px;white-space:pre-wrap;word-break:break-word}
+.vlist{margin:0 0 16px;padding-left:20px}.vlist li{margin:0 0 4px}
+.sect{font:500 12px/18px var(--font);color:var(--n600);text-transform:uppercase;letter-spacing:.04em;margin:16px 0 8px}
+.sect:first-child{margin-top:0}
+.btn.small{padding:4px 12px;font-size:12px;line-height:18px}
+.over{color:var(--err-700);font-weight:600}
+@media (max-width:980px){.app{grid-template-columns:1fr}aside{position:static;height:auto;border-right:0;border-bottom:1px solid var(--n200)}.grid{grid-template-columns:1fr}.row{grid-template-columns:1fr}main{padding:16px}}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<div class="app">
+  <aside aria-label="Tools">
+    <div class="logo">
+      <!-- Approximation of the LWM mark (three rising bars + arrow, blue→purple). Swap in the official SVG. -->
+      <svg width="32" height="32" viewBox="0 0 32 32" aria-hidden="true"><defs><linearGradient id="g" x1="0" y1="1" x2="1" y2="0"><stop offset="0" stop-color="#3B82F6"/><stop offset="1" stop-color="#6D2CD8"/></linearGradient></defs><rect x="3" y="18" width="5" height="9" rx="1.5" fill="url(#g)"/><rect x="11" y="13" width="5" height="14" rx="1.5" fill="url(#g)"/><rect x="19" y="8" width="5" height="19" rx="1.5" fill="url(#g)"/><path d="M5 12l8-6 5 3 9-6M22 3h5v5" stroke="url(#g)" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      <div><b>Content Agent</b><small>Tool console</small></div>
+    </div>
+    <label for="filter" class="help" style="margin:0 0 4px 8px">Find a tool</label>
+    <input id="filter" type="search" placeholder="ingest, draft, zernio…" autocomplete="off">
+    <nav id="tools"></nav>
+  </aside>
+  <main>
+    <h1>Tool console</h1>
+    <p class="sub">Call any tool through the real signed API. For development and staging only.</p>
+    <div class="warn" role="note">Your signing secret stays in this tab's memory — it is never stored or sent anywhere but used to sign requests locally. Use a development/staging secret, never production.</div>
+
+    <section class="card" aria-labelledby="conn">
+      <header><h2 id="conn">Connection</h2><span id="tools-count" class="pill idle">not connected</span></header>
+      <div class="row">
+        <div><label for="secret">Signing secret</label><input id="secret" type="password" autocomplete="off" spellcheck="false"><p class="help">One of INTERNAL_AUTH_SECRETS</p></div>
+        <div><label for="tenant">tenant_id</label><input id="tenant" value="tenant_demo"></div>
+        <div><label for="brand">brand_id</label><input id="brand" value="brand_demo"></div>
+      </div>
+      <label for="ctx">Request context (JSON, merged with the fields above)</label>
+      <textarea id="ctx" style="min-height:150px" spellcheck="false"></textarea>
+      <div class="actions"><button class="btn ghost" id="connect" type="button">Connect &amp; load tools</button><button class="btn ghost" id="resetctx" type="button">Reset context</button></div>
+    </section>
+
+    <div class="grid">
+      <section class="card" aria-labelledby="req">
+        <header><h2 id="req">Request</h2><span id="tool-name" class="pill soft">select a tool</span></header>
+        <p id="tool-desc" class="help" style="margin:0 0 12px"></p>
+        <label for="input">input (JSON) — <code>{{draft_id}}</code> auto-fills the latest ID from earlier calls — or paste a real ID (no braces needed)</label>
+        <textarea id="input" spellcheck="false">{}</textarea>
+        <div class="actions"><button class="btn primary" id="run" type="button" disabled>Run tool</button><button class="btn ghost" id="example" type="button">Reset example</button></div>
+        <div style="margin-top:16px"><label>Recent IDs (click to copy)</label><div id="ids" class="chips" aria-live="polite"><span class="help">None yet</span></div></div>
+      </section>
+      <section class="card" aria-labelledby="res">
+        <header><h2 id="res">Response</h2><span id="status" class="pill idle">no call yet</span></header>
+        <div class="meta" id="meta"></div>
+        <pre id="out" aria-live="polite">—</pre>
+      </section>
+    </div>
+
+    <section class="card" aria-labelledby="view">
+      <header><h2 id="view">What it fetched</h2><span id="view-kind" class="pill idle">nothing yet</span></header>
+      <div id="view-body" aria-live="polite"><p class="help" style="margin:0">Run a tool and its content shows up here in readable form (the raw JSON stays in Response).</p></div>
+    </section>
+
+    <section class="card" aria-labelledby="hist">
+      <header><h2 id="hist">History</h2><button class="btn ghost" id="clear" type="button">Clear</button></header>
+      <table><thead><tr><th>Time</th><th>Tool</th><th>Status</th><th>Latency</th><th>Trace</th></tr></thead><tbody id="history"></tbody></table>
+    </section>
+  </main>
+</div>
+<script>
+"use strict";
+const $ = (id) => document.getElementById(id);
+const enc = new TextEncoder();
+const GROUPS = [
+  ["Ingest & extract", ["ingest_url", "extract_content", "read_x_post", "read_youtube_video"]],
+  ["Generate", ["generate_content_report", "generate_social_draft", "repurpose_content", "find_images", "validate_content"]],
+  ["Review & publish", ["review_draft", "submit_review_decision", "prepare_publish_request", "publish_draft", "schedule_draft"]],
+  ["Zernio reads", ["read_comments", "read_inbox", "read_performance"]],
+  ["Operations", ["get_job", "get_draft", "cancel_job"]],
+];
+const EXAMPLES = {
+  ingest_url: { urls: ["https://en.wikipedia.org/wiki/Rust_(programming_language)"], requested_channels: ["linkedin", "x"], brand_context: { tone_of_voice: "friendly", content_rules: ["no jargon"] } },
+  extract_content: { source_id: "{{source_id}}" },
+  generate_content_report: { source_ids: ["{{source_id}}"], campaign_goal: "awareness", requested_channels: ["linkedin", "x"] },
+  generate_social_draft: { report_id: "{{report_id}}", channels: ["linkedin", "x"], post_type: "text", include_hashtags: true, include_cta: true },
+  repurpose_content: { report_id: "{{report_id}}", targets: [{ channel: "x", format: "thread" }, { channel: "instagram", format: "carousel" }] },
+  find_images: { draft_id: "{{draft_id}}", count: 2 },
+  validate_content: { draft_id: "{{draft_id}}" },
+  review_draft: { draft_id: "{{draft_id}}" },
+  submit_review_decision: { draft_id: "{{draft_id}}", decision: "approved", reviewer_id: "user_reviewer", notes: "" },
+  prepare_publish_request: { draft_id: "{{draft_id}}", zernio_profile_id: "profile_demo", channels: ["linkedin"], action: "schedule", scheduled_at: "" },
+  publish_draft: { publish_request_id: "{{publish_request_id}}" },
+  schedule_draft: { publish_request_id: "{{publish_request_id}}" },
+  read_x_post: { url: "https://x.com/jack/status/20" },
+  read_youtube_video: { url: "https://www.youtube.com/watch?v=dQw4w9WgXcQ" },
+  read_comments: { zernio_profile_id: "profile_demo", platform: "instagram", limit: 25 },
+  read_inbox: { zernio_profile_id: "profile_demo", limit: 25 },
+  read_performance: { zernio_profile_id: "profile_demo" },
+  get_job: { job_id: "{{job_id}}" },
+  get_draft: { draft_id: "{{draft_id}}" },
+  cancel_job: { job_id: "{{job_id}}", reason: "cancelled from console" },
+};
+const ICON = '<svg viewBox="0 0 16 16" fill="none" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 8h10M9 4l4 4-4 4"/></svg>';
+const state = { tools: [], current: null, ids: {}, history: [] };
+
+function defaultCtx() {
+  const acct = (p) => ({ platform: p, account_id: "acc_" + p, access: "write" });
+  return {
+    actor_id: "user_console", source: "letwemarket_agent",
+    permissions: { allowed_tools: ["*"], allowed_channels: ["instagram", "facebook", "x", "linkedin"], allowed_actions: ["read", "draft", "publish", "schedule"] },
+    zernio: { zernio_profile_id: "profile_demo", connected_accounts: ["instagram", "facebook", "x", "linkedin"].map(acct) },
+    quota_remaining: 1000,
+  };
+}
+function resetCtx() { $("ctx").value = JSON.stringify(defaultCtx(), null, 2); }
+
+async function sha256Hex(bytes) {
+  const d = await crypto.subtle.digest("SHA-256", bytes);
+  return [...new Uint8Array(d)].map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+async function hmacHex(secret, message) {
+  const key = await crypto.subtle.importKey("raw", enc.encode(secret), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
+  const sig = await crypto.subtle.sign("HMAC", key, enc.encode(message));
+  return [...new Uint8Array(sig)].map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+// signature = hex(HMAC(secret, "{ts}\n{METHOD}\n{path_and_query}\n{sha256_hex(body)}"))
+async function signedFetch(method, path, bodyText) {
+  const secret = $("secret").value;
+  if (!secret) throw new Error("Enter the signing secret first.");
+  const body = bodyText ? enc.encode(bodyText) : new Uint8Array();
+  const ts = String(Math.floor(Date.now() / 1000));
+  const sig = await hmacHex(secret, `${ts}\n${method}\n${path}\n${await sha256Hex(body)}`);
+  const started = performance.now();
+  const resp = await fetch(path, { method, body: bodyText ? bodyText : undefined, headers: { "content-type": "application/json", "x-lwm-timestamp": ts, "x-lwm-signature": sig }, cache: "no-store", credentials: "omit" });
+  const text = await resp.text();
+  let json = null; try { json = JSON.parse(text); } catch (_) {}
+  return { status: resp.status, json, text, ms: Math.round(performance.now() - started), trace: resp.headers.get("x-trace-id") || "" };
+}
+
+function el(tag, props, ...kids) {
+  const e = document.createElement(tag);
+  for (const [k, v] of Object.entries(props || {})) { if (k === "class") e.className = v; else if (k.startsWith("on")) e.addEventListener(k.slice(2), v); else e.setAttribute(k, v); }
+  for (const k of kids) e.append(k);
+  return e;
+}
+function setPill(node, cls, text) { node.className = "pill " + cls; node.textContent = text; }
+
+function renderTools() {
+  const q = $("filter").value.trim().toLowerCase();
+  const nav = $("tools"); nav.replaceChildren();
+  const byName = Object.fromEntries(state.tools.map((t) => [t.name, t]));
+  const listed = new Set();
+  for (const [group, names] of GROUPS) {
+    const items = names.filter((n) => byName[n] && n.includes(q));
+    names.forEach((n) => listed.add(n));
+    if (!items.length) continue;
+    nav.append(el("div", { class: "group" }, group));
+    for (const n of items) nav.append(toolButton(byName[n]));
+  }
+  const rest = state.tools.filter((t) => !listed.has(t.name) && t.name.includes(q));
+  if (rest.length) { nav.append(el("div", { class: "group" }, "Other")); rest.forEach((t) => nav.append(toolButton(t))); }
+}
+function toolButton(t) {
+  const b = el("button", { class: "tool", type: "button", "aria-current": String(state.current === t.name) }, n(ICON), t.name);
+  b.addEventListener("click", () => selectTool(t.name));
+  return b;
+}
+function n(html) { const t = document.createElement("template"); t.innerHTML = html; return t.content.firstChild; } // static markup only (ICON constant)
+
+function selectTool(name) {
+  state.current = name;
+  const t = state.tools.find((x) => x.name === name);
+  $("tool-name").textContent = name;
+  $("tool-desc").textContent = t ? `${t.description}. Needs action: ${t.required_action || "per input"} · Zernio: ${t.zernio_connection}/${t.zernio_access}` : "";
+  $("input").value = JSON.stringify(EXAMPLES[name] || {}, null, 2);
+  $("run").disabled = false;
+  // A fresh tool starts with clean Response and content panes (past calls stay in History).
+  setPill($("status"), "idle", "no call yet"); $("meta").replaceChildren(); $("out").textContent = "—"; resetView();
+  renderTools();
+}
+const REAL_ID = /^(job|src|report|draft|pubreq|camp)_[0-9a-f]{8,}$/;
+function fillPlaceholders(text) {
+  return text.replace(/\{\{\s*(\w+)\s*\}\}/g, (_, k) => {
+    // Forgiving: {{src_0067…}} (a real ID wrapped in braces) is used as the literal ID.
+    if (REAL_ID.test(k)) return k;
+    if (!(k in state.ids)) {
+      const known = Object.keys(state.ids).join(", ") || "none yet";
+      throw new Error(`"{{${k}}}" is not a known placeholder (available now: ${known}). Use {{source_id}}-style names to auto-fill from earlier calls, or replace the whole {{…}} with the actual ID.`);
+    }
+    return state.ids[k];
+  });
+}
+function captureIds(v, depth = 0) {
+  if (!v || typeof v !== "object" || depth > 3) return;
+  for (const [k, val] of Object.entries(v)) {
+    if (typeof val === "string" && /^(job_id|source_id|report_id|draft_id|publish_request_id|campaign_id)$/.test(k)) state.ids[k] = val;
+    else if (Array.isArray(val) && k === "sources" && val[0]) captureIds(val[0], depth + 1);
+    else if (typeof val === "object") captureIds(val, depth + 1);
+  }
+  renderIds();
+}
+function renderIds() {
+  const box = $("ids"); box.replaceChildren();
+  const keys = Object.keys(state.ids);
+  if (!keys.length) { box.append(el("span", { class: "help" }, "None yet")); return; }
+  for (const k of keys) {
+    const c = el("button", { class: "chip", type: "button", title: "Copy " + k }, `${k}: ${state.ids[k].slice(0, 18)}…`);
+    c.addEventListener("click", () => navigator.clipboard && navigator.clipboard.writeText(state.ids[k]));
+    box.append(c);
+  }
+}
+function buildContext() {
+  const ctx = JSON.parse($("ctx").value);
+  ctx.tenant_id = $("tenant").value.trim();
+  ctx.brand_id = $("brand").value.trim();
+  ctx.request_id = "req_console_" + crypto.randomUUID().replaceAll("-", "");
+  ctx.idempotency_key = ctx.idempotency_key || undefined;
+  return ctx;
+}
+function show(res, tool) {
+  const ok = res.status >= 200 && res.status < 300;
+  setPill($("status"), ok ? "ok" : "err", `${res.status} ${ok ? "OK" : (res.json && res.json.error ? res.json.error.code : "Error")}`);
+  const meta = $("meta"); meta.replaceChildren(el("span", {}, `${res.ms} ms`));
+  if (res.trace) meta.append(el("span", {}, "trace " + res.trace));
+  if (res.json && res.json.error && res.json.error.retryable) meta.append(el("span", { class: "pill soft" }, "retryable"));
+  $("out").textContent = res.json ? JSON.stringify(res.json, null, 2) : res.text;
+  renderView(tool, res.json);
+  state.history.unshift({ at: new Date(), tool, status: res.status, ms: res.ms, trace: res.trace, body: res.json || res.text, input: $("input").value });
+  state.history = state.history.slice(0, 50);
+  renderHistory();
+}
+function renderHistory() {
+  const tb = $("history"); tb.replaceChildren();
+  state.history.forEach((row) => {
+    const ok = row.status >= 200 && row.status < 300;
+    const tr = el("tr", { tabindex: "0" },
+      el("td", {}, row.at.toLocaleTimeString()), el("td", {}, row.tool),
+      el("td", {}, el("span", { class: "pill " + (ok ? "ok" : "err") }, String(row.status))), el("td", {}, row.ms + " ms"), el("td", {}, row.trace.slice(0, 18)));
+    const open = () => { selectTool(row.tool); $("input").value = row.input; $("out").textContent = typeof row.body === "string" ? row.body : JSON.stringify(row.body, null, 2); if (typeof row.body === "object") renderView(row.tool, row.body); };
+    tr.addEventListener("click", open); tr.addEventListener("keydown", (e) => { if (e.key === "Enter") open(); });
+    tb.append(tr);
+  });
+}
+
+
+// ---- "What it fetched": readable views of tool results. All dynamic text goes through textContent.
+function h(tag, cls, text) { const e = document.createElement(tag); if (cls) e.className = cls; if (text !== undefined && text !== null) e.textContent = String(text); return e; }
+function sect(t) { return h("div", "sect", t); }
+function pillEl(cls, t) { return h("span", "pill " + cls, t); }
+function safeHttps(u) { try { const x = new URL(u); return x.protocol === "https:" ? x.href : null; } catch (_) { return null; } }
+function fmtDate(v) { if (!v) return "—"; const d = new Date(v); return isNaN(d) ? String(v) : d.toLocaleString(); }
+function kvList(rows) {
+  const dl = h("dl", "kv");
+  for (const [k, v] of rows) { dl.append(h("dt", "", k)); const dd = h("dd"); if (v instanceof Node) dd.append(v); else dd.textContent = v === null || v === undefined || v === "" ? "—" : String(v); dl.append(dd); }
+  return dl;
+}
+function bullets(items) { const ul = h("ul", "vlist"); (items || []).forEach((i) => ul.append(h("li", "", i))); return ul; }
+function copyBtn(label, text) { const b = h("button", "btn ghost small", label); b.type = "button"; b.addEventListener("click", () => { if (navigator.clipboard) navigator.clipboard.writeText(text); b.textContent = "Copied"; setTimeout(() => (b.textContent = label), 1200); }); return b; }
+function setView(kind, pillCls, nodes) { setPill($("view-kind"), pillCls, kind); $("view-body").replaceChildren(...nodes); }
+function resetView() { setView("nothing yet", "idle", [h("p", "help", "Run a tool and its content shows up here in readable form (the raw JSON stays in Response).")]); }
+
+function viewContent(v) {
+  const ok = v.extraction_status === "success";
+  const nodes = [];
+  nodes.push(h("p", "vtitle", v.title || "(no title)"));
+  nodes.push(kvList([
+    ["Source", v.url], ["Author", v.author], ["Published", fmtDate(v.published_at)], ["Language", v.language],
+    ["Extracted with", v.extraction_method], ["Length", (v.text || "").length.toLocaleString() + " characters"],
+    ["Canonical URL", v.metadata && v.metadata.canonical_url], ["Screenshot", v.screenshot_url],
+  ]));
+  if (v.summary) { nodes.push(sect("Summary")); nodes.push(h("p", "", v.summary)); }
+  const imgs = ((v.metadata && v.metadata.images) || []).map(safeHttps).filter(Boolean).slice(0, 8);
+  if (imgs.length) {
+    nodes.push(sect(`Images found on the page (${imgs.length})`));
+    const t = h("div", "thumbs");
+    imgs.forEach((u) => { const i = document.createElement("img"); i.src = u; i.alt = ""; i.loading = "lazy"; i.referrerPolicy = "no-referrer"; i.title = u; t.append(i); });
+    nodes.push(t);
+  }
+  const head = h("div", "sect", "Extracted text (what the AI will read)");
+  nodes.push(head);
+  nodes.push(h("div", "reader", v.text || ""));
+  const row = h("div", "actions"); row.append(copyBtn("Copy text", v.text || "")); nodes.push(row);
+  setView(ok ? "extracted content" : "extraction " + v.extraction_status, ok ? "ok" : "err", nodes);
+}
+function viewReport(v) {
+  const n = [sect("Recommended angle"), h("p", "", v.recommended_angle), sect("Key points"), bullets(v.key_points), sect("Audience takeaways"), bullets(v.audience_takeaways),
+    sect("Content pillars"), bullets(v.content_pillars), sect("Recommended channels"), bullets(v.recommended_channels)];
+  if ((v.risks || []).length) { n.push(sect("Risks flagged")); n.push(bullets(v.risks)); }
+  n.push(sect("Based on")); n.push(bullets(v.source_links)); n.push(kvList([["Confidence", v.confidence], ["Report ID", v.report_id], ["Model", v.model && `${v.model.provider} / ${v.model.model} (prompt ${v.model.prompt_version})`]]));
+  setView("content report", "ok", n);
+}
+const LIMITS = { x: 280, instagram: 2200, facebook: 63206, linkedin: 3000, threads: 500, bluesky: 300, tiktok: 2200, pinterest: 500, youtube: 5000 };
+function variantCard(x) {
+  const card = h("div", "vcard"); const t = h("h3"); t.append(h("span", "", x.channel + (x.format ? " · " + x.format : "")));
+  const full = [x.caption, x.cta, (x.hashtags || []).join(" ")].filter(Boolean).join("\n\n");
+  const lim = LIMITS[x.channel]; const len = full.length;
+  const count = h("span", lim && len > lim ? "over" : "help", lim ? `${len} / ${lim}` : String(len)); t.append(count); card.append(t);
+  card.append(h("p", "", x.caption));
+  if (x.cta) card.append(h("p", "help", "CTA: " + x.cta));
+  if ((x.hashtags || []).length) card.append(h("p", "help", x.hashtags.join(" ")));
+  (x.parts || []).forEach((p, i) => card.append(h("p", "help", `Part ${i + 2}: ${p}`)));
+  (x.media || []).forEach((m) => card.append(h("p", "help", `Image: ${m.url} — alt: ${m.alt_text}`)));
+  return card;
+}
+function viewDraft(v) {
+  const g = h("div", "vcards"); (v.variants || []).forEach((x) => g.append(variantCard(x)));
+  const nodes = [kvList([["Draft", v.draft_id], ["Status", v.status], ["Compliance", v.compliance && v.compliance.status]]), g];
+  const warns = (v.compliance && v.compliance.warnings) || [];
+  if (warns.length) { nodes.push(sect("Warnings")); nodes.push(bullets(warns)); }
+  const issues = ((v.compliance && v.compliance.issues) || []).map((i) => `${i.code}${i.channel ? " [" + i.channel + "]" : ""}: ${i.message}`);
+  if (issues.length) { nodes.push(sect("Issues (must fix)")); nodes.push(bullets(issues)); }
+  setView("draft preview", "ok", nodes);
+}
+function viewSources(v, tool) {
+  const nodes = [kvList([["Job", v.job_id], ["Status", v.status]])];
+  const list = h("div", "vcards");
+  (v.sources || []).forEach((s) => {
+    const st = s.extraction_status || (v.status === "queued" ? "pending" : "");
+    const c = h("div", "vcard"); const t = h("h3"); t.append(h("span", "", s.source_type || ""));
+    t.append(pillEl(st === "success" ? "ok" : st === "failed" ? "err" : "idle", st || "queued")); c.append(t);
+    c.append(h("p", "", s.title || s.url)); c.append(h("p", "help", s.url));
+    if (s.extraction_method) c.append(h("p", "help", "via " + s.extraction_method));
+    if (s.error) c.append(h("p", "over", (s.error.message || JSON.stringify(s.error))));
+    list.append(c);
+  });
+  nodes.push(list);
+  const pending = (v.sources || []).some((s) => !s.extraction_status || s.extraction_status === "pending");
+  if (pending && v.job_id) {
+    nodes.push(h("p", "help", "The worker extracts pages in the background (usually a few seconds)."));
+    const b = h("button", "btn primary", "Wait for extraction & show the content"); b.type = "button";
+    b.addEventListener("click", async () => { b.disabled = true; b.textContent = "Waiting for the worker…"; await fetchAndShow(v.job_id); });
+    const a = h("div", "actions"); a.append(b); nodes.push(a);
+  } else if ((v.sources || []).some((s) => s.extraction_status === "success")) {
+    const b = h("button", "btn primary", "Show the extracted content"); b.type = "button";
+    b.addEventListener("click", async () => { b.disabled = true; await fetchAndShow(v.job_id); });
+    const a = h("div", "actions"); a.append(b); nodes.push(a);
+  }
+  setView(tool === "get_job" ? "job status" : "queued job", pending ? "idle" : "ok", nodes);
+}
+function viewImages(v) {
+  const rows = (v.images || []).map((i) => `${i.width}×${i.height} (${i.aspect_ratio}) · ${i.source} · ${i.validation_status} · ${i.url}`);
+  setView("images", "ok", [sect("Stored images"), bullets(rows)]);
+}
+function renderView(tool, v) {
+  if (!v || typeof v !== "object") return resetView();
+  if (v.error) {
+    const n = [h("p", "", v.error.message), h("p", "help", `${v.error.code}${v.error.retryable ? " · retryable" : ""}`)];
+    if (v.error.details && v.error.details.setup) n.push(h("p", "help", "Setup needed: " + v.error.details.setup));
+    return setView("error", "err", n);
+  }
+  if (typeof v.text === "string" && "extraction_status" in v) return viewContent(v);
+  if (Array.isArray(v.key_points)) return viewReport(v);
+  if (Array.isArray(v.variants) && v.draft_id) return viewDraft(v);
+  if (Array.isArray(v.variants) && v.campaign_id) return setView("campaign", "ok", [kvList([["Campaign", v.campaign_id]]), bullets(v.variants.map((x) => `${x.channel} · ${x.format} → ${x.draft_id}`))]);
+  if (Array.isArray(v.sources) && v.job_id) return viewSources(v, tool);
+  if (Array.isArray(v.images) && v.draft_id) return viewImages(v);
+  setView("no readable content", "idle", [h("p", "help", "This tool returns status/IDs rather than fetched content — see the JSON in Response.")]);
+}
+async function callTool(tool, input) { return signedFetch("POST", "/internal/v1/tools/" + tool, JSON.stringify({ context: buildContext(), input })); }
+// Poll get_job until the worker finishes the first source, then fetch and show its content.
+async function fetchAndShow(jobId) {
+  setPill($("view-kind"), "idle", "waiting for worker…");
+  const deadline = Date.now() + 90000; let job = null;
+  while (Date.now() < deadline) {
+    const r = await callTool("get_job", { job_id: jobId });
+    if (!r.json || r.json.error) return show(r, "get_job");
+    job = r.json;
+    if (job.sources.every((s) => s.extraction_status !== "pending")) break;
+    await new Promise((res) => setTimeout(res, 1000));
+  }
+  const src = job && job.sources.find((s) => s.extraction_status === "success");
+  if (!src) { return renderView("get_job", job || { error: { code: "TIMEOUT", message: "The worker did not finish in time. Is it running? ./scripts/dev.sh logs worker" } }); }
+  const r = await callTool("extract_content", { source_id: src.source_id });
+  show(r, "extract_content");
+  if (r.json && !r.json.error) captureIds(r.json);
+}
+
+async function connect() {
+  try {
+    const r = await signedFetch("GET", "/internal/v1/tools", "");
+    if (r.status !== 200) throw new Error(r.json && r.json.error ? `${r.json.error.code}: ${r.json.error.message}` : `HTTP ${r.status}`);
+    state.tools = r.json.tools;
+    setPill($("tools-count"), "ok", `${state.tools.length} tools`);
+    renderTools();
+    if (!state.current) selectTool("ingest_url");
+  } catch (e) { setPill($("tools-count"), "err", "connection failed"); $("out").textContent = String(e.message || e); }
+}
+async function run() {
+  if (!state.current) return;
+  $("run").disabled = true;
+  try {
+    const input = JSON.parse(fillPlaceholders($("input").value));
+    for (const [k, v] of Object.entries(input)) if (v === "" && k === "scheduled_at") input[k] = new Date(Date.now() + 2 * 864e5).toISOString();
+    const body = JSON.stringify({ context: buildContext(), input });
+    const res = await signedFetch("POST", "/internal/v1/tools/" + state.current, body);
+    show(res, state.current);
+    if (res.json && !res.json.error) captureIds(res.json);
+  } catch (e) { setPill($("status"), "err", "not sent"); $("meta").replaceChildren(); $("out").textContent = String(e.message || e); }
+  finally { $("run").disabled = false; }
+}
+$("connect").addEventListener("click", connect);
+$("run").addEventListener("click", run);
+$("example").addEventListener("click", () => state.current && selectTool(state.current));
+$("resetctx").addEventListener("click", resetCtx);
+$("filter").addEventListener("input", renderTools);
+$("clear").addEventListener("click", () => { state.history = []; renderHistory(); });
+$("secret").addEventListener("keydown", (e) => { if (e.key === "Enter") connect(); });
+resetCtx();
+</script>
+</body>
+</html>

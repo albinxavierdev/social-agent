@@ -1,0 +1,136 @@
+# Reference manifests (staging/production). Replace image names; create the Secret from your secret manager
+# (names in secret.example.yaml). Rolling updates + readiness gating give zero-downtime deploys; for blue/green,
+# run two Deployments behind the Service selector and flip the `track` label.
+apiVersion: v1
+kind: ConfigMap
+metadata: { name: content-agent-config }
+data:
+  APP_ENV: production
+  BIND_ADDR: 0.0.0.0:8080
+  LLM_PROVIDER: anthropic
+  IMAGE_PROVIDER: openai
+  STORAGE_KIND: s3
+  RESPECT_ROBOTS: "true"
+  RATE_TENANT_PER_MIN: "600"
+  RETENTION_SOURCE_DAYS: "90"
+  RUST_LOG: info
+---
+apiVersion: batch/v1
+kind: Job
+metadata: { name: content-agent-migrate }
+spec:
+  backoffLimit: 2
+  template:
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: migrate
+          image: registry.example.com/content-agent:latest
+          command: ["content-agent-api", "--migrate-only"]
+          envFrom: [{ configMapRef: { name: content-agent-config } }, { secretRef: { name: content-agent-secrets } }]
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: { name: content-agent-api, labels: { app: content-agent-api, track: stable } }
+spec:
+  replicas: 3
+  strategy: { type: RollingUpdate, rollingUpdate: { maxUnavailable: 0, maxSurge: 1 } }
+  selector: { matchLabels: { app: content-agent-api } }
+  template:
+    metadata:
+      labels: { app: content-agent-api, track: stable }
+      annotations: { prometheus.io/scrape: "true", prometheus.io/port: "8080", prometheus.io/path: /metrics }
+    spec:
+      terminationGracePeriodSeconds: 45
+      securityContext: { runAsNonRoot: true, runAsUser: 10001, seccompProfile: { type: RuntimeDefault } }
+      containers:
+        - name: api
+          image: registry.example.com/content-agent:latest
+          command: ["content-agent-api"]
+          ports: [{ containerPort: 8080 }]
+          envFrom: [{ configMapRef: { name: content-agent-config } }, { secretRef: { name: content-agent-secrets } }]
+          readinessProbe: { httpGet: { path: /readyz, port: 8080 }, periodSeconds: 5, failureThreshold: 3 }
+          livenessProbe: { httpGet: { path: /healthz, port: 8080 }, periodSeconds: 10 }
+          resources: { requests: { cpu: 200m, memory: 256Mi }, limits: { cpu: "1", memory: 512Mi } }
+          securityContext: { allowPrivilegeEscalation: false, readOnlyRootFilesystem: true, capabilities: { drop: ["ALL"] } }
+---
+apiVersion: v1
+kind: Service
+metadata: { name: content-agent-api }
+spec:
+  selector: { app: content-agent-api }
+  ports: [{ port: 80, targetPort: 8080 }]
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata: { name: content-agent-api }
+spec:
+  scaleTargetRef: { apiVersion: apps/v1, kind: Deployment, name: content-agent-api }
+  minReplicas: 3
+  maxReplicas: 20
+  metrics: [{ type: Resource, resource: { name: cpu, target: { type: Utilization, averageUtilization: 65 } } }]
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata: { name: content-agent-api }
+spec: { minAvailable: 2, selector: { matchLabels: { app: content-agent-api } } }
+---
+# General worker pool: HTTP / GitHub / X / YouTube / FireCrawl extraction, LLM, images, Zernio submission.
+apiVersion: apps/v1
+kind: Deployment
+metadata: { name: content-agent-worker }
+spec:
+  replicas: 3
+  selector: { matchLabels: { app: content-agent-worker } }
+  template:
+    metadata: { labels: { app: content-agent-worker } }
+    spec:
+      terminationGracePeriodSeconds: 120   # job draining: finish leased tasks before exit
+      securityContext: { runAsNonRoot: true, runAsUser: 10001 }
+      containers:
+        - name: worker
+          image: registry.example.com/content-agent:latest
+          command: ["content-agent-worker"]
+          envFrom: [{ configMapRef: { name: content-agent-config } }, { secretRef: { name: content-agent-secrets } }]
+          env: [{ name: EXTRACTOR_OBSCURA_ENABLED, value: "false" }]
+          resources: { requests: { cpu: 250m, memory: 256Mi }, limits: { cpu: "1", memory: 1Gi } }
+          securityContext: { allowPrivilegeEscalation: false, readOnlyRootFilesystem: true, capabilities: { drop: ["ALL"] } }
+---
+# Separate Obscura browser-worker pool (build with --target obscura-worker). Memory/CPU limits here are the
+# per-job ceilings Obscura processes run under; concurrency is capped by OBSCURA_MAX_CONCURRENCY.
+# Run this pool with an egress NetworkPolicy that denies RFC1918/link-local/metadata ranges.
+apiVersion: apps/v1
+kind: Deployment
+metadata: { name: content-agent-obscura-worker }
+spec:
+  replicas: 2
+  selector: { matchLabels: { app: content-agent-obscura-worker } }
+  template:
+    metadata: { labels: { app: content-agent-obscura-worker } }
+    spec:
+      terminationGracePeriodSeconds: 120
+      securityContext: { runAsNonRoot: true, runAsUser: 10001 }
+      containers:
+        - name: worker
+          image: registry.example.com/content-agent-obscura-worker:latest
+          command: ["content-agent-worker"]
+          envFrom: [{ configMapRef: { name: content-agent-config } }, { secretRef: { name: content-agent-secrets } }]
+          env:
+            - { name: OBSCURA_MAX_CONCURRENCY, value: "4" }
+            - { name: WORKER_CONCURRENCY, value: "4" }
+          resources: { requests: { cpu: "1", memory: 1Gi }, limits: { cpu: "2", memory: 2Gi } }
+          securityContext: { allowPrivilegeEscalation: false, readOnlyRootFilesystem: false, capabilities: { drop: ["ALL"] } }
+          volumeMounts: [{ name: tmp, mountPath: /tmp }]
+      volumes: [{ name: tmp, emptyDir: { medium: Memory, sizeLimit: 256Mi } }]
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata: { name: content-agent-egress }
+spec:
+  podSelector: { matchExpressions: [{ key: app, operator: In, values: [content-agent-worker, content-agent-obscura-worker] }] }
+  policyTypes: [Egress]
+  egress:
+    - to:
+        - ipBlock: { cidr: 0.0.0.0/0, except: [10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16, 169.254.0.0/16, 100.64.0.0/10, 127.0.0.0/8] }
+    - to: [{ namespaceSelector: {} }]   # Postgres/DNS inside the cluster — tighten to your DB namespace
+      ports: [{ port: 5432 }, { port: 53, protocol: UDP }, { port: 53, protocol: TCP }]

@@ -1,0 +1,51 @@
+groups:
+  - name: content-agent
+    rules:
+      - alert: ContentAgentHighErrorRate
+        expr: sum(rate(tool_requests_total{status="error"}[5m])) / sum(rate(tool_requests_total[5m])) > 0.1
+        for: 10m
+        labels: { severity: page }
+        annotations: { summary: "More than 10% of tool calls are failing" }
+      - alert: ContentAgentAuthFailuresSpike
+        expr: rate(auth_failures_total[5m]) > 1
+        for: 5m
+        labels: { severity: page }
+        annotations: { summary: "Sustained internal-auth failures (misconfigured secret rotation or probing)" }
+      - alert: ContentAgentQueueBacklog
+        expr: queue_depth > 500
+        for: 10m
+        labels: { severity: warn }
+        annotations: { summary: "Work queue backlog is growing; scale workers" }
+      - alert: ContentAgentOldestJobStale
+        expr: queue_oldest_pending_age_seconds > 900
+        for: 5m
+        labels: { severity: page }
+        annotations: { summary: "Oldest pending task is older than 15 minutes" }
+      - alert: ContentAgentDeadLetters
+        expr: increase(queue_tasks_total{outcome="dead_letter"}[1h]) > 0
+        labels: { severity: warn }
+        annotations: { summary: "Tasks were dead-lettered; inspect queue_tasks WHERE state='dead'" }
+      - alert: ContentAgentExtractionFailing
+        expr: sum by (extractor) (rate(extraction_attempts_total{outcome="failure"}[15m])) / sum by (extractor) (rate(extraction_attempts_total[15m])) > 0.5
+        for: 15m
+        labels: { severity: warn }
+        annotations: { summary: "Extractor {{ $labels.extractor }} failure rate above 50%" }
+      - alert: ContentAgentZernioFailures
+        expr: sum(rate(zernio_requests_total{outcome="failure"}[10m])) / sum(rate(zernio_requests_total[10m])) > 0.2
+        for: 10m
+        labels: { severity: page }
+        annotations: { summary: "Zernio calls are failing (outage, expired key, or rate limits)" }
+      - alert: ContentAgentLlmCostSpike
+        expr: sum(increase(llm_cost_usd_micros_total[1h])) / 1e6 > 50
+        labels: { severity: warn }
+        annotations: { summary: "LLM spend exceeded $50 in the last hour" }
+      - alert: ContentAgentBrowserPoolSaturated
+        expr: browser_pool_utilisation > 0.9
+        for: 10m
+        labels: { severity: warn }
+        annotations: { summary: "Obscura browser pool is saturated; add worker replicas" }
+      - alert: ContentAgentImageValidationFailures
+        expr: sum(rate(image_validation_total{outcome="failed"}[30m])) / sum(rate(image_validation_total[30m])) > 0.5
+        for: 30m
+        labels: { severity: warn }
+        annotations: { summary: "More than half of image candidates are failing validation" }

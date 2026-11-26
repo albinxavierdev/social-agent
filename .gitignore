@@ -1,0 +1,19 @@
+# Local-only tooling and agent skills — never commit or publish
+.claude/
+.agents/
+skills-lock.json
+.cursor/
+.codex/
+
+# Secrets / local config
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# Rust
+target/
+
+# Local dev runner state (pids, logs, generated assets)
+.dev/

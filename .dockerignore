@@ -1,0 +1,8 @@
+target
+.git
+.claude
+.agents
+.env
+.env.*
+.local-assets
+skills-lock.json

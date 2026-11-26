@@ -1,0 +1,61 @@
+[package]
+name = "content-agent"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.82"
+description = "LetWeMarket internal Content Agent tool API"
+publish = false
+
+[lib]
+name = "content_agent"
+path = "src/lib.rs"
+
+[[bin]]
+name = "content-agent-api"
+path = "src/bin/api.rs"
+
+[[bin]]
+name = "content-agent-worker"
+path = "src/bin/worker.rs"
+
+[dependencies]
+anyhow = "1"
+async-trait = "0.1"
+axum = { version = "0.8", features = ["macros"] }
+base64 = "0.22"
+bytes = "1"
+chrono = { version = "0.4", features = ["serde"] }
+futures = "0.3"
+hex = "0.4"
+hmac = "0.12"
+imagesize = "0.13"
+metrics = "0.24"
+png = "0.17"
+metrics-exporter-prometheus = { version = "0.16", default-features = false }
+rand = "0.8"
+rusty-s3 = "0.5"
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls", "gzip", "brotli"] }
+scraper = "0.20"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+sha2 = "0.10"
+sqlx = { version = "0.8", default-features = false, features = ["runtime-tokio", "tls-rustls", "postgres", "json", "chrono", "macros", "migrate"] }
+thiserror = "1"
+tokio = { version = "1", features = ["full"] }
+tokio-util = "0.7"
+tower-http = { version = "0.6", features = ["trace", "limit", "request-id"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
+url = "2"
+uuid = { version = "1", features = ["v4", "serde"] }
+
+[dev-dependencies]
+http-body-util = "0.1"
+tower = { version = "0.5", features = ["util"] }
+wiremock = "0.6"
+jsonschema = { version = "0.30", default-features = false }
+
+[profile.release]
+lto = "thin"
+codegen-units = 4
+strip = true
